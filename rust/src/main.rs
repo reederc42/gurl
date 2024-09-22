@@ -5,9 +5,13 @@ use regex::Regex;
 use reqwest;
 use url::Url;
 
+const CAPTURE_GROUP: &str = "out";
+
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = r#"Include a capture group named "out" to match next expressions against only that captured string.
-Text is split by lines at the first non-multiline expression."#)]
+#[command(version, about, long_about = format!(r#"gurl is grep/cURL
+
+Include a capture group named "{}" to match next expressions against only that captured string.
+"#, CAPTURE_GROUP))]
 struct Cli {
     /// File or URL; by default files are split line-by-line and URLs are not split
     #[arg()]
@@ -21,8 +25,6 @@ struct Cli {
     #[arg(short, long)]
     multiline: bool,
 }
-
-const CAPTURE_GROUP: &str = "out";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
@@ -77,14 +79,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn match_all_re<'a>(regexes: &Vec<(Regex, bool)>, text: &'a str) -> Option<&'a str> {
     let mut haystack = text;
     for re in regexes {
-        let cap = match re.0.captures(haystack) {
-            Some(c) => c,
-            None => return None,
-        };
         if re.1 {
+            let cap = match re.0.captures(haystack) {
+                Some(c) => c,
+                None => return None,
+            };
             haystack = match cap.name(CAPTURE_GROUP) {
                 Some(c) => c.as_str(),
                 None => return None,
+            }
+        } else {
+            if !re.0.is_match(haystack) {
+                return None;
             }
         }
     }
